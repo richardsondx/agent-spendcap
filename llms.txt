@@ -1,0 +1,46 @@
+# agent-spendcap
+
+Budgets and semantic rate limits for AI agents. Zero dependencies. MIT.
+
+## Install
+
+npm i agent-spendcap
+
+## What it does
+
+Gives each agent scope a cost cap (USD), a tool-call cap, an external-write cap,
+and named sliding-window rate limits (e.g. 5 financial actions per hour).
+Check before every action, record after. check() is pure; record() mutates.
+
+## Quickstart
+
+import { createBudget } from "agent-spendcap";
+const budget = createBudget({ maxCostUsd: 5, maxToolCalls: 50, rates: { refundsPerHour: 5 } });
+const r = budget.check({ kind: "tool", costUsd: 0.02 });
+if (!r.allowed) throw new Error(r.reason);
+budget.record({ kind: "tool", costUsd: 0.02 });
+
+## API
+
+createBudget(config): { check, record, snapshot, reset }
+config: maxCostUsd?, maxToolCalls?, maxExternalWrites?, rates? (name -> max per
+window), rateWindowMs? (default 3600000), scope? (default "default"),
+onExhausted? (fires at most once per dimension per reset), logJsonl?
+(append-only audit path), now? (injectable clock).
+check({ kind, costUsd?, rateKeys? }) -> { allowed, reason?, remaining }
+kinds: "tool" | "financial" | "email" | "external-write".
+Only kind === "external-write" counts toward the external-write cap.
+record(usage) updates counters, appends { ts, scope, kind, costUsd, rateKeys }
+to the JSONL log, fires onExhausted for newly exhausted dimensions.
+snapshot() -> { spent, remaining, scope }. reset() zeroes counters and fired
+flags; the JSONL log is never cleared.
+
+## Pairs with
+
+callgate (https://github.com/richardsondx/callgate): the gate decides whether
+an agent SHOULD act; agent-spendcap decides HOW MUCH it may spend doing it.
+
+## Links
+
+Repo: https://github.com/richardsondx/agent-spendcap
+Skill: skills/agent-spendcap/SKILL.md
